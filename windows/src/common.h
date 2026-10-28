@@ -18,6 +18,7 @@
 #include <shellapi.h>
 #include <windowsx.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

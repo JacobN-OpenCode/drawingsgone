@@ -24,9 +24,12 @@ struct Mirror {
     HDC memory = nullptr;
     HBITMAP bitmap = nullptr;
     HGDIOBJ previous = nullptr;
+    uint32_t* pixels = nullptr;
     bool windowMode = false;
     HWND source = nullptr;
     bool outline = true;
+    bool screenFallback = false;
+    bool warnedFallback = false;
 
     ~Mirror() { release(); }
 
@@ -35,6 +38,7 @@ struct Mirror {
             SelectObject(memory, previous);
         }
         previous = nullptr;
+        pixels = nullptr;
         if (bitmap) {
             DeleteObject(bitmap);
             bitmap = nullptr;
@@ -57,15 +61,45 @@ struct Mirror {
         release();
         HDC screen = GetDC(nullptr);
         memory = CreateCompatibleDC(screen);
-        bitmap = CreateCompatibleBitmap(screen, w, h);
+        BITMAPINFO info = {};
+        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = w;
+        info.bmiHeader.biHeight = -h;  // top-down, so pixels[] runs left to right
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        void* bits = nullptr;
+        bitmap = CreateDIBSection(screen, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
         ReleaseDC(nullptr, screen);
-        if (!memory || !bitmap) {
+        if (!memory || !bitmap || !bits) {
             release();
             return;
         }
+        pixels = static_cast<uint32_t*>(bits);
         previous = SelectObject(memory, bitmap);
         width = w;
         height = h;
+    }
+
+    // A hardware-accelerated window can answer PrintWindow successfully with a
+    // perfectly black picture. Spot that cheaply and fall back to reading the
+    // screen at that spot: it shows the annotations, but a black rectangle
+    // helps nobody.
+    bool looksBlack() const {
+        if (!pixels || width <= 0 || height <= 0) {
+            return false;
+        }
+        size_t total = static_cast<size_t>(width) * static_cast<size_t>(height);
+        size_t step = total / 4096;
+        if (step == 0) {
+            step = 1;
+        }
+        for (size_t i = 0; i < total; i += step) {
+            if ((pixels[i] & 0x00ffffffu) != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Fills the mirror bitmap with the live picture.
@@ -92,12 +126,24 @@ struct Mirror {
                 SetWindowPos(hwnd, HWND_TOPMOST, target.left, target.top, w, h,
                              SWP_NOACTIVATE | SWP_NOOWNERZORDER);
             }
-            if (!PrintWindow(source, memory, PW_RENDERFULLCONTENT)) {
-                HDC windowDc = GetWindowDC(source);
-                if (windowDc) {
-                    BitBlt(memory, 0, 0, w, h, windowDc, 0, 0, SRCCOPY | CAPTUREBLT);
-                    ReleaseDC(source, windowDc);
+            RECT blank = {0, 0, w, h};
+            HBRUSH black = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
+            FillRect(memory, &blank, black);
+            bool printed = PrintWindow(source, memory, PW_RENDERFULLCONTENT) != FALSE;
+            screenFallback = !printed || looksBlack();
+            if (screenFallback) {
+                HDC screen = GetDC(nullptr);
+                if (screen) {
+                    BitBlt(memory, 0, 0, w, h, screen, target.left, target.top,
+                           SRCCOPY | CAPTUREBLT);
+                    ReleaseDC(nullptr, screen);
                 }
+                if (!warnedFallback) {
+                    warnedFallback = true;
+                    dgLog(L"PrintWindow gave nothing usable; falling back to screen pixels");
+                }
+            } else {
+                warnedFallback = false;
             }
             return true;
         }
