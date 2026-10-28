@@ -71,7 +71,7 @@ struct Mirror {
     // Fills the mirror bitmap with the live picture.
     bool capture() {
         if (windowMode) {
-            if (!source || !IsWindow(source)) {
+            if (!source || !IsWindow(source) || IsIconic(source)) {
                 return false;
             }
             RECT rect = {0, 0, 0, 0};
@@ -254,11 +254,12 @@ bool coversMostOfItsMonitor(const RECT& rect) {
 
 bool isOwnedByUs(DWORD pid) { return pid == GetCurrentProcessId(); }
 
+struct OverlayScan {
+    std::vector<HWND>* out;
+};
+
 BOOL CALLBACK collectOverlays(HWND hwnd, LPARAM lparam) {
-    struct Context {
-        std::vector<HWND>* out;
-    };
-    auto* context = reinterpret_cast<Context*>(lparam);
+    auto* context = reinterpret_cast<OverlayScan*>(lparam);
 
     DWORD pid = 0;
     GetWindowThreadProcessId(hwnd, &pid);
@@ -297,7 +298,7 @@ BOOL CALLBACK collectOverlays(HWND hwnd, LPARAM lparam) {
 
 std::vector<WindowInfo> gWindowList;
 
-BOOL CALLBACK collectWindows(HWND hwnd, LPARAM lparam) {
+BOOL CALLBACK collectWindows(HWND hwnd, LPARAM) {
     DWORD pid = 0;
     GetWindowThreadProcessId(hwnd, &pid);
     if (isOwnedByUs(pid) || !IsWindowVisible(hwnd) || IsIconic(hwnd)) {
@@ -439,7 +440,7 @@ void Overlay::setRegion(const RECT& region) {
 void Overlay::setTarget(HWND window, const std::wstring& title) {
     target_ = window;
     targetTitle_ = title;
-    if (!window) {
+    if (!window || IsIconic(window)) {
         return;
     }
     RECT rect = rectOf(window);
@@ -454,6 +455,13 @@ void Overlay::setEnabled(bool enabled) {
         enabled_ = false;
         persist();
         hideAll();
+        return;
+    }
+    if (style_ == CoverStyle::LiveWindow && !hasTarget()) {
+        enabled_ = false;
+        persist();
+        hideAll();
+        dgLog(L"window mode with no target; not enabling");
         return;
     }
     if (!regionOnSomeMonitor()) {
@@ -514,7 +522,7 @@ void Overlay::menuOpen(bool open) {
 
 void Overlay::restoreSession() {
     Settings stored = settings::load();
-    if (!stored.enabled || !hasRegion_) {
+    if (!stored.enabled || !hasRegion_ || style_ == CoverStyle::LiveWindow) {
         return;
     }
     setEnabled(true);
@@ -570,7 +578,8 @@ void Overlay::present() {
                                  rect.top, rect.right - rect.left, rect.bottom - rect.top,
                                  nullptr, nullptr, instance_, nullptr);
         if (solid_) {
-            SetPropW(solid_, L"outline", reinterpret_cast<HANDLE>(outline_ ? 1 : 0));
+            SetPropW(solid_, L"outline",
+                     reinterpret_cast<HANDLE>(static_cast<intptr_t>(outline_ ? 1 : 0)));
             SetWindowPos(solid_, HWND_TOPMOST, rect.left, rect.top, rect.right - rect.left,
                          rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
@@ -592,7 +601,7 @@ void Overlay::present() {
         mirror->target = rect;
         mirror->outline = outline_;
         mirror->hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT |
-                                           WS_EX_NOACTIVATE | WS_EX_LAYERED,
+                                           WS_EX_NOACTIVATE,
                                        kMirrorClass, L"DrawingsGone mirror", WS_POPUP, rect.left,
                                        rect.top, rect.right - rect.left, rect.bottom - rect.top,
                                        nullptr, nullptr, instance_, nullptr);
@@ -600,9 +609,10 @@ void Overlay::present() {
             delete mirror;
             return;
         }
-        SetLayeredWindowAttributes(mirror->hwnd, 0, 255, LWA_ALPHA);
         SetWindowLongPtrW(mirror->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(mirror));
-        SetWindowDisplayAffinity(mirror->hwnd, WDA_EXCLUDEFROMCAPTURE);
+        if (!SetWindowDisplayAffinity(mirror->hwnd, WDA_EXCLUDEFROMCAPTURE)) {
+            dgLog(L"SetWindowDisplayAffinity failed; the mirror may appear in captures");
+        }
         SetWindowPos(mirror->hwnd, HWND_TOPMOST, rect.left, rect.top, rect.right - rect.left,
                      rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
         SetTimer(mirror->hwnd, 1, kWindowFrameMs, nullptr);
@@ -636,7 +646,7 @@ void Overlay::present() {
             mirror->target = rect;
             mirror->outline = self->outline_;
             mirror->hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT |
-                                               WS_EX_NOACTIVATE | WS_EX_LAYERED,
+                                               WS_EX_NOACTIVATE,
                                            kMirrorClass, L"DrawingsGone mirror", WS_POPUP,
                                            rect.left, rect.top, rect.right - rect.left,
                                            rect.bottom - rect.top, nullptr, nullptr,
@@ -645,9 +655,10 @@ void Overlay::present() {
                 delete mirror;
                 return TRUE;
             }
-            SetLayeredWindowAttributes(mirror->hwnd, 0, 255, LWA_ALPHA);
             SetWindowLongPtrW(mirror->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(mirror));
-            SetWindowDisplayAffinity(mirror->hwnd, WDA_EXCLUDEFROMCAPTURE);
+            if (!SetWindowDisplayAffinity(mirror->hwnd, WDA_EXCLUDEFROMCAPTURE)) {
+                dgLog(L"SetWindowDisplayAffinity failed; the mirror may appear in captures");
+            }
             SetWindowPos(mirror->hwnd, HWND_TOPMOST, rect.left, rect.top, rect.right - rect.left,
                          rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             SetTimer(mirror->hwnd, 1, kAreaFrameMs, nullptr);
@@ -692,9 +703,7 @@ void Overlay::hideAll() {
 
 void Overlay::hideDetectedOverlays() {
     std::vector<HWND> found;
-    struct Context {
-        std::vector<HWND>* out;
-    } context{&found};
+    OverlayScan context{&found};
     EnumWindows(collectOverlays, reinterpret_cast<LPARAM>(&context));
     for (HWND window : found) {
         if (std::find(hiddenOverlays_.begin(), hiddenOverlays_.end(), window) !=

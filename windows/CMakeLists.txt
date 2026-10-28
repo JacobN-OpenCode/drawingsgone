@@ -29,6 +29,8 @@ target_compile_definitions(DrawingsGone PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_
 
 if (MSVC)
     target_compile_options(DrawingsGone PRIVATE /W4 /permissive- /utf-8)
+    # res/app.rc already embeds res/app.manifest; stop the linker adding another.
+    target_link_options(DrawingsGone PRIVATE /MANIFEST:NO)
 else()
     target_compile_options(DrawingsGone PRIVATE -Wall -Wextra -static -static-libgcc -static-libstdc++)
     target_link_options(DrawingsGone PRIVATE -static -mwindows)

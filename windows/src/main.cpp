@@ -17,6 +17,7 @@ namespace {
 const wchar_t* kMainClass = L"DG_Main";
 const UINT kTrayId = 1;
 const int kIconId = 101;
+const int kIconOffId = 102;
 
 const UINT kHotToggle = 1;
 const UINT kHotPeek = 2;
@@ -207,6 +208,11 @@ void startRegionSelection() {
 }
 
 void enableWithTip() {
+    if (gOverlay.style() == CoverStyle::LiveWindow && !gOverlay.hasTarget()) {
+        gOverlay.setEnabled(false);
+        PostMessageW(gMain, WM_DG_TRAYMENU, 0, 0);
+        return;
+    }
     gOverlay.toggle();
     if (gOverlay.enabled() && gOverlay.style() == CoverStyle::LiveArea && !tipShown()) {
         markTipShown();
@@ -239,8 +245,10 @@ void handleCommand(UINT id) {
             break;
         case CMD_STYLE_WINDOW:
             gOverlay.setStyle(CoverStyle::LiveWindow);
-            if (!gOverlay.targetTitle().empty()) {
+            if (gOverlay.hasTarget()) {
                 gOverlay.setEnabled(true);
+            } else {
+                PostMessageW(gMain, WM_DG_TRAYMENU, 0, 0);
             }
             break;
         case CMD_STYLE_SOLID:
@@ -277,11 +285,11 @@ void handleCommand(UINT id) {
 
 void registerHotKeys() {
     const UINT mods = MOD_CONTROL | MOD_ALT | MOD_SHIFT;
-    RegisterHotKey(nullptr, kHotToggle, mods, 'D');
-    RegisterHotKey(nullptr, kHotPeek, mods, 'P');
-    RegisterHotKey(nullptr, kHotArea, mods, 'A');
-    RegisterHotKey(nullptr, kHotWhole, mods, 'F');
-    RegisterHotKey(nullptr, kHotWindow, mods, 'W');
+    RegisterHotKey(gMain, kHotToggle, mods, 'D');
+    RegisterHotKey(gMain, kHotPeek, mods, 'P');
+    RegisterHotKey(gMain, kHotArea, mods, 'A');
+    RegisterHotKey(gMain, kHotWhole, mods, 'F');
+    RegisterHotKey(gMain, kHotWindow, mods, 'W');
 }
 
 LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -335,11 +343,11 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
             return 0;
         case WM_DESTROY:
             gOverlay.shutdown();
-            UnregisterHotKey(nullptr, kHotToggle);
-            UnregisterHotKey(nullptr, kHotPeek);
-            UnregisterHotKey(nullptr, kHotArea);
-            UnregisterHotKey(nullptr, kHotWhole);
-            UnregisterHotKey(nullptr, kHotWindow);
+            UnregisterHotKey(hwnd, kHotToggle);
+            UnregisterHotKey(hwnd, kHotPeek);
+            UnregisterHotKey(hwnd, kHotArea);
+            UnregisterHotKey(hwnd, kHotWhole);
+            UnregisterHotKey(hwnd, kHotWindow);
             {
                 NOTIFYICONDATAW data = {};
                 data.cbSize = sizeof(data);
@@ -411,17 +419,23 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int) {
     cls.lpszClassName = kMainClass;
     RegisterClassExW(&cls);
 
-    gMain = CreateWindowExW(0, kMainClass, L"DrawingsGone", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
-                            instance, nullptr);
+    gMain = CreateWindowExW(WS_EX_TOOLWINDOW, kMainClass, L"DrawingsGone", WS_POPUP, 0, 0, 0, 0,
+                            nullptr, nullptr, instance, nullptr);
     if (!gMain) {
         return 1;
     }
 
-    gIconIdle = LoadIconW(instance, MAKEINTRESOURCEW(kIconId));
+    int small = GetSystemMetrics(SM_CXSMICON);
+    gIconIdle = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kIconId), IMAGE_ICON,
+                                              small, small, LR_DEFAULTCOLOR));
     if (!gIconIdle) {
         gIconIdle = LoadIconW(nullptr, IDI_APPLICATION);
     }
-    gIconOff = gIconIdle;
+    gIconOff = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kIconOffId), IMAGE_ICON,
+                                             small, small, LR_DEFAULTCOLOR));
+    if (!gIconOff) {
+        gIconOff = gIconIdle;
+    }
 
     gOverlay.init(instance, gMain);
     Overlay::restoreHiddenOverlays();

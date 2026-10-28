@@ -24,6 +24,7 @@ public:
     bool hasRegion() const { return hasRegion_; }
     RECT region() const { return region_; }
     std::wstring targetTitle() const { return targetTitle_; }
+    bool hasTarget() const { return target_ && IsWindow(target_) && !IsIconic(target_); }
 
     void setStyle(CoverStyle style);
     void setOutline(bool on);
