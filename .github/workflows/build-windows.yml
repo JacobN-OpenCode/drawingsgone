@@ -1,0 +1,31 @@
+name: build-windows
+
+on:
+  push:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S windows -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Show result
+        run: |
+          Get-Item build/Release/DrawingsGone.exe | Select-Object Name, Length
+          Get-FileHash build/Release/DrawingsGone.exe -Algorithm SHA256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DrawingsGone-windows-x64
+          path: build/Release/DrawingsGone.exe
+          if-no-files-found: error

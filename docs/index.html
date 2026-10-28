@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DrawingsGone — a live view of your screen with annotations filtered out</title>
+<meta name="description" content="DrawingsGone shows you your own screen, live, with the drawing and annotation layers filtered out. Nothing is frozen and your screen share keeps running.">
+<meta name="theme-color" content="#0c1016">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+<meta property="og:title" content="DrawingsGone">
+<meta property="og:description" content="A live view of your screen with annotation layers filtered out. Nothing is frozen, your share keeps running.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://drawingsgone.navaratne.uk/">
+</head>
+<body>
+<header class="wrap">
+  <div class="brand">
+    <img src="icon.png" alt="" width="44" height="44">
+    <div>
+      <h1>DrawingsGone</h1>
+      <p class="kicker">For Windows &amp; macOS</p>
+    </div>
+  </div>
+  <p class="lede">
+    Someone is scribbling over your screen while you present. DrawingsGone gives you a
+    live view of your own screen with the drawing layers filtered out, so you can keep
+    reading and working. Nothing freezes, and your screen share keeps running.
+  </p>
+  <div class="actions">
+    <a class="button primary" href="downloads/DrawingsGone-1.0-windows-x64.exe" download>
+      Download for Windows
+      <span>64-bit · 10 2004 or newer</span>
+    </a>
+    <a class="button" href="downloads/DrawingsGone-1.0-macos.zip" download>
+      Download for macOS
+      <span>13 Ventura or newer</span>
+    </a>
+  </div>
+  <p class="small">
+    Both builds are unsigned, so the first launch will warn you.
+    <a href="#install">How to get past it →</a>
+  </p>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>What it does</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>Live, not frozen</h3>
+        <p>The mirror keeps updating at around 30 frames a second, so it is your real
+        screen rather than a screenshot. Your own screen share is untouched.</p>
+      </article>
+      <article class="card">
+        <h3>Never in the share</h3>
+        <p>The mirror window is marked excluded from capture
+        (<code>WDA_EXCLUDEFROMCAPTURE</code> on Windows, <code>sharingType = .none</code>
+        on macOS), so it never appears to anyone watching.</p>
+      </article>
+      <article class="card">
+        <h3>Whole screen or one area</h3>
+        <p>Filter the entire desktop, or drag out just the rectangle you need to keep an
+        eye on. A one-pixel outline shows exactly where the filter sits.</p>
+      </article>
+      <article class="card">
+        <h3>Peek when you want</h3>
+        <p>One keystroke drops the filter for five seconds so you can see the annotations
+        on purpose, then puts it back.</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>On Windows</h2>
+    <p class="body">
+      Windows has no equivalent of the macOS API that removes <em>another app's</em>
+      full-screen overlay from a screen capture, so on Windows the annotation-free view
+      comes from mirroring one window instead of the whole desktop. Three modes:
+    </p>
+    <table class="modes">
+      <tbody>
+        <tr>
+          <th>Live · one window</th>
+          <td>The annotation-free mode. Pick the window you are sharing; it is captured on
+          its own, underneath any drawings, and mirrored live in the same place on screen.</td>
+        </tr>
+        <tr>
+          <th>Live · screen area</th>
+          <td>A real-time copy of a rectangle of the desktop. Anything drawn over the screen
+          still shows up here, because that is what the desktop actually looks like.</td>
+        </tr>
+        <tr>
+          <th>Solid cover</th>
+          <td>An opaque blanket over the area. Needs no capture at all, and is the fallback
+          when a window refuses to be mirrored.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="body">
+      There is also an experimental option that hides full-screen topmost overlay windows
+      while the filter is on. It is off by default.
+    </p>
+
+    <h3 class="sh">Shortcuts</h3>
+    <ul class="keys">
+      <li><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>D</kbd> hide / show annotations</li>
+      <li><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>P</kbd> peek for five seconds</li>
+      <li><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>A</kbd> select an area</li>
+      <li><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>F</kbd> whole screen</li>
+      <li><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>Shift</kbd><kbd>W</kbd> pick a window to mirror</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>On macOS</h2>
+    <p class="body">
+      The macOS build is the original: a menu-bar app that captures the screen in real
+      time and excludes high-layer overlay windows, which is how drawing tools such as
+      Slick and conferencing annotations render. It needs <strong>Screen Recording</strong>
+      permission (System Settings → Privacy &amp; Security → Screen Recording); the solid
+      cover mode needs no permission at all.
+    </p>
+    <ul class="keys">
+      <li><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>D</kbd> hide / show annotations</li>
+      <li><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd> peek for five seconds</li>
+      <li><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>A</kbd> select an area</li>
+      <li><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd> whole screen</li>
+    </ul>
+  </section>
+
+  <section id="install">
+    <h2>Installing</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>Windows</h3>
+        <ol>
+          <li>Run <code>DrawingsGone.exe</code>. It lives in the notification area; there is
+          no window to close.</li>
+          <li>SmartScreen will say “Windows protected your PC”. Choose
+          <strong>More info</strong> → <strong>Run anyway</strong>. The build is not code-signed.</li>
+          <li>Right-click the pencil to pick a mode. Choose <strong>Mirror a Window…</strong>
+          for the annotation-free view.</li>
+          <li>Optional: <strong>Launch at Login</strong> adds it to your user startup.</li>
+        </ol>
+      </article>
+      <article class="card">
+        <h3>macOS</h3>
+        <ol>
+          <li>Unzip and drag <code>DrawingsGone.app</code> into <code>/Applications</code>.</li>
+          <li>First launch: right-click the app → <strong>Open</strong> → <strong>Open</strong>.
+          It is ad-hoc signed, not notarised. If macOS insists it is damaged, run
+          <code>xattr -dr com.apple.quarantine /Applications/DrawingsGone.app</code>.</li>
+          <li>Grant Screen Recording when asked, then relaunch it.</li>
+          <li>The pencil appears in the menu bar.</li>
+        </ol>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Under the hood</h2>
+    <p class="body">
+      Windows: a Win32 app, GDI capture, no runtime to install.
+      macOS: Swift, ScreenCaptureKit.
+      Both are tiny, have no telemetry, no network calls, no accounts, and no installer
+      that writes anywhere except a couple of preference keys.
+    </p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>DrawingsGone 1.0 · © 2026 Jacob Navaratne</p>
+  <p class="small"><a href="https://navaratne.uk">navaratne.uk</a></p>
+</footer>
+</body>
+</html>
